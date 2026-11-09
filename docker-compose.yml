@@ -1,0 +1,38 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: oficina-pagamento-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: oficina_pagamento
+    ports:
+      - '27017:27017'
+    volumes:
+      - oficina_pagamento_mongo_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      target: production
+    container_name: oficina-pagamento-app
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      MONGODB_URI: mongodb://mongodb:27017/oficina_pagamento
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
+      MERCADOPAGO_NOTIFICATION_URL: ${MERCADOPAGO_NOTIFICATION_URL:-http://localhost:3002/pagamentos/webhook}
+    ports:
+      - '${PORT:-3002}:3002'
+
+volumes:
+  oficina_pagamento_mongo_data:
