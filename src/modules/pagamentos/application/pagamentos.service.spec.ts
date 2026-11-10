@@ -2,11 +2,13 @@ import { EntityNotFoundException } from '../../../shared/domain/exceptions';
 import { Pagamento } from '../domain/pagamento.entity';
 import type { PagamentoRepository } from '../domain/pagamento.repository';
 import type { MercadoPagoClient } from '../infrastructure/mercado-pago.client';
+import type { SagaEventsPublisher } from '../infrastructure/saga-events.publisher';
 import { PagamentosService } from './pagamentos.service';
 
 describe('PagamentosService', () => {
   let pagamentoRepository: jest.Mocked<PagamentoRepository>;
   let mercadoPagoClient: jest.Mocked<MercadoPagoClient>;
+  let sagaEventsPublisher: jest.Mocked<SagaEventsPublisher>;
   let service: PagamentosService;
 
   beforeEach(() => {
@@ -23,8 +25,16 @@ describe('PagamentosService', () => {
       })),
       consultarPagamento: jest.fn(),
     } as unknown as jest.Mocked<MercadoPagoClient>;
+    sagaEventsPublisher = {
+      publicarPagamentoAprovado: jest.fn(),
+      publicarPagamentoRejeitado: jest.fn(),
+    };
 
-    service = new PagamentosService(pagamentoRepository, mercadoPagoClient);
+    service = new PagamentosService(
+      pagamentoRepository,
+      mercadoPagoClient,
+      sagaEventsPublisher,
+    );
   });
 
   describe('criarParaOrdemServico', () => {
@@ -90,6 +100,12 @@ describe('PagamentosService', () => {
       });
 
       expect(resultado.getStatus()).toBe('APROVADO');
+      expect(
+        sagaEventsPublisher.publicarPagamentoAprovado,
+      ).toHaveBeenCalledWith('os-1');
+      expect(
+        sagaEventsPublisher.publicarPagamentoRejeitado,
+      ).not.toHaveBeenCalled();
     });
 
     it('rejeita o pagamento quando o Mercado Pago confirma status rejected', async () => {
@@ -108,6 +124,9 @@ describe('PagamentosService', () => {
       });
 
       expect(resultado.getStatus()).toBe('REJEITADO');
+      expect(
+        sagaEventsPublisher.publicarPagamentoRejeitado,
+      ).toHaveBeenCalledWith('os-1');
     });
 
     it('ignora (sem lançar) webhook duplicado para pagamento já aprovado', async () => {
@@ -132,6 +151,9 @@ describe('PagamentosService', () => {
         }),
       ).resolves.toBeDefined();
       expect(pagamentoRepository.salvar).not.toHaveBeenCalled();
+      expect(
+        sagaEventsPublisher.publicarPagamentoAprovado,
+      ).not.toHaveBeenCalled();
     });
 
     it('lança EntityNotFoundException quando o pagamento referenciado não existe', async () => {

@@ -7,7 +7,10 @@ import {
 import { Pagamento } from '../domain/pagamento.entity';
 import { PAGAMENTO_REPOSITORY } from '../domain/pagamento.repository';
 import type { PagamentoRepository } from '../domain/pagamento.repository';
+import { StatusPagamento } from '../domain/status-pagamento.enum';
 import { MercadoPagoClient } from '../infrastructure/mercado-pago.client';
+import { SAGA_EVENTS_PUBLISHER } from '../infrastructure/saga-events.publisher';
+import type { SagaEventsPublisher } from '../infrastructure/saga-events.publisher';
 
 export interface CriarPagamentoInput {
   ordemServicoId: string;
@@ -29,12 +32,14 @@ export class PagamentosService {
     @Inject(PAGAMENTO_REPOSITORY)
     private readonly pagamentoRepository: PagamentoRepository,
     private readonly mercadoPagoClient: MercadoPagoClient,
+    @Inject(SAGA_EVENTS_PUBLISHER)
+    private readonly sagaEventsPublisher: SagaEventsPublisher,
   ) {}
 
   /**
-   * Cria a cobrança para uma OS finalizada. Hoje é chamado via REST
-   * (síncrono); o passo da Saga equivalente — consumir `OSFinalizada` do
-   * RabbitMQ — vai chamar este mesmo método a partir de um listener.
+   * Cria a cobrança para uma OS finalizada — chamado pelo
+   * `PagamentosEventsController` ao consumir `os.finalizada` do
+   * os-service.
    */
   async criarParaOrdemServico(input: CriarPagamentoInput): Promise<Pagamento> {
     const existente = await this.pagamentoRepository.buscarPorOrdemServicoId(
@@ -113,7 +118,19 @@ export class PagamentosService {
       throw error;
     }
 
-    return this.pagamentoRepository.salvar(pagamento);
+    const salvo = await this.pagamentoRepository.salvar(pagamento);
+
+    if (salvo.getStatus() === StatusPagamento.APROVADO) {
+      this.sagaEventsPublisher.publicarPagamentoAprovado(
+        salvo.getOrdemServicoId(),
+      );
+    } else if (salvo.getStatus() === StatusPagamento.REJEITADO) {
+      this.sagaEventsPublisher.publicarPagamentoRejeitado(
+        salvo.getOrdemServicoId(),
+      );
+    }
+
+    return salvo;
   }
 
   async obter(id: string): Promise<Pagamento> {

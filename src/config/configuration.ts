@@ -9,6 +9,10 @@ export interface AppConfig {
     accessToken: string;
     notificationUrl: string;
   };
+  rabbitmq: {
+    url: string;
+    queue: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -26,5 +30,9 @@ export default (): AppConfig => ({
     notificationUrl:
       process.env.MERCADOPAGO_NOTIFICATION_URL ??
       'http://localhost:3002/pagamentos/webhook',
+  },
+  rabbitmq: {
+    url: process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672',
+    queue: 'pagamento_queue',
   },
 });

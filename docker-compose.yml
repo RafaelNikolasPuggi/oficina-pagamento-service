@@ -31,8 +31,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
       MERCADOPAGO_NOTIFICATION_URL: ${MERCADOPAGO_NOTIFICATION_URL:-http://localhost:3002/pagamentos/webhook}
+      # RabbitMQ roda no docker-compose do oficina-os-service (porta 5672
+      # publicada no host). host.docker.internal deixa este container
+      # alcançar o broker do outro compose project via o host.
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@host.docker.internal:5672}
     ports:
       - '${PORT:-3002}:3002'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
 
 volumes:
   oficina_pagamento_mongo_data:
