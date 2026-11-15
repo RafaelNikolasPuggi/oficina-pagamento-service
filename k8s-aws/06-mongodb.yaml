@@ -3,12 +3,32 @@
 # gasto na Fase 3. Só este serviço usa, então fica no namespace
 # oficina-pagamento (não em oficina-shared).
 #
-# ATENÇÃO: sem PersistentVolumeClaim de propósito — um Pod reiniciado perde
-# os dados. Isso é aceitável para a demonstração da Fase 4 (replica a mesma
-# filosofia "custo mínimo, sem multi-az" do RDS da Fase 3), mas é a primeira
-# coisa a rever antes de qualquer uso real: precisaria de uma PVC (requer o
-# addon aws-ebs-csi-driver habilitado no oficina-infra-k8s, que hoje não
-# está) ou migrar para DocumentDB/Atlas.
+# PersistentVolumeClaim de verdade (StorageClass gp3 via EBS CSI driver,
+# habilitado no oficina-infra-k8s) — os dados sobrevivem a reinício de Pod.
+# Ainda assim: 1 réplica, sem backup automático — aceitável pra demonstração
+# da Fase 4, mesma filosofia "custo mínimo" do RDS single-AZ da Fase 3.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: oficina-ebs-gp3
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: gp3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: oficina-pagamento-mongo-data
+  namespace: oficina-pagamento
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: oficina-ebs-gp3
+  resources:
+    requests:
+      storage: 2Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,6 +38,8 @@ metadata:
     app: oficina-pagamento-mongo
 spec:
   replicas: 1
+  strategy:
+    type: Recreate # evita 2 Pods disputando a mesma PVC ReadWriteOnce durante um rollout
   selector:
     matchLabels:
       app: oficina-pagamento-mongo
@@ -31,6 +53,9 @@ spec:
           image: mongo:7
           ports:
             - containerPort: 27017
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
           readinessProbe:
             exec:
               command: ['mongosh', '--eval', "db.adminCommand('ping')"]
@@ -43,6 +68,10 @@ spec:
             limits:
               cpu: '500m'
               memory: '512Mi'
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: oficina-pagamento-mongo-data
 ---
 apiVersion: v1
 kind: Service
