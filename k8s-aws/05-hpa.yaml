@@ -4,11 +4,14 @@ metadata:
   name: oficina-pagamento-app
   namespace: oficina-pagamento
 spec:
+  # minReplicas=1 (não 2): os 2 nós t3.small do cluster compartilhado têm
+  # limite baixo de pods por nó, e já dividem espaço com RabbitMQ, Mongo e
+  # os DaemonSets do New Relic — 2 réplicas fixas por serviço não cabiam.
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: oficina-pagamento-app
-  minReplicas: 2
+  minReplicas: 1
   maxReplicas: 10
   metrics:
     - type: Resource
