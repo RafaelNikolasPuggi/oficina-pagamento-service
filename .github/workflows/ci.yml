@@ -213,6 +213,12 @@ jobs:
         run: |
           kubectl apply -f k8s-aws/06-mongodb.yaml
           kubectl apply -f k8s-aws/07-rabbitmq.yaml
+          kubectl -n oficina-shared rollout status deployment/oficina-rabbitmq --timeout=180s || {
+            kubectl -n oficina-shared get pods -o wide
+            kubectl -n oficina-shared describe pods -l app=oficina-rabbitmq
+            kubectl -n oficina-shared logs -l app=oficina-rabbitmq --tail=100
+            exit 1
+          }
 
       - name: Aplicar manifestos Kubernetes da aplicação (k8s-aws/)
         run: |
