@@ -49,7 +49,7 @@ Mesma separação dos outros 2 serviços:
 
 - **[`/infra`](infra)** — Terraform (`kind` + MongoDB + RabbitMQ), cluster local efêmero, validado de graça a cada push (job `deploy`).
 - **[`/k8s`](k8s)** / **[`/k8s-aws`](k8s-aws)** — manifestos de deploy local e real.
-- **Diferente dos outros 2**: este serviço precisa de **exposição pública** (`type: LoadBalancer`) porque o Mercado Pago chama o webhook de fora do cluster. O MongoDB real também é self-hosted no cluster (sem PVC por enquanto — ver comentário em `k8s-aws/06-mongodb.yaml`).
+- **Diferente dos outros 2**: este serviço precisa de **exposição pública** (`type: LoadBalancer`) porque o Mercado Pago chama o webhook de fora do cluster. O MongoDB real também é self-hosted no cluster, com PersistentVolumeClaim de verdade (StorageClass `gp3` via o addon `aws-ebs-csi-driver`, habilitado no `oficina-infra-k8s`).
 - RabbitMQ real (namespace `oficina-shared`) aplicado de forma idempotente, igual aos outros 2 serviços.
 
 ## CI/CD
@@ -58,4 +58,4 @@ GitHub Actions (`.github/workflows/ci.yml`): `build-test` → `docker-build-push
 
 ## Status
 
-Saga completa (RabbitMQ), cobertura de testes acima de 80%, infra como código (local + AWS). Próximas etapas: New Relic, PVC pro MongoDB em produção (ou migrar pra um serviço gerenciado), vídeo + PDF de entrega da Fase 4.
+Saga completa (RabbitMQ), cobertura de testes acima de 80%, infra como código (local + AWS, com PVC de verdade pro MongoDB). Próximas etapas: New Relic, vídeo + PDF de entrega da Fase 4.
