@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oficina-pagamento-app
+  namespace: oficina-pagamento
+  labels:
+    app: oficina-pagamento-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: oficina-pagamento-app
+  template:
+    metadata:
+      labels:
+        app: oficina-pagamento-app
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: oficina-pagamento-app
+          image: ghcr.io/OWNER/oficina-pagamento-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3002
+          envFrom:
+            - configMapRef:
+                name: oficina-pagamento-app-config
+            - secretRef:
+                name: oficina-pagamento-app-secret
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+            limits:
+              cpu: '500m'
+              memory: '256Mi'
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 20
+            periodSeconds: 15

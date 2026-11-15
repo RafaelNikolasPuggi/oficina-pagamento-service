@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oficina-pagamento
+  labels:
+    app.kubernetes.io/part-of: oficina-pagamento-service
+---
+# Mesmo namespace compartilhado declarado pelos outros 2 microsserviços —
+# aplicar aqui de novo é idempotente, não importa qual repositório faça o
+# deploy primeiro.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oficina-shared
+  labels:
+    app.kubernetes.io/part-of: oficina-fase4-microservices

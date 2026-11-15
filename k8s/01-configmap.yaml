@@ -1,0 +1,13 @@
+# Variáveis NÃO sensíveis. Valores sensíveis (JWT, token do Mercado Pago)
+# ficam em 02-secret.yaml — nunca aqui.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-pagamento-app-config
+  namespace: oficina-pagamento
+data:
+  NODE_ENV: 'production'
+  PORT: '3002'
+  MONGODB_URI: 'mongodb://oficina-pagamento-mongo:27017/oficina_pagamento'
+  RABBITMQ_URL: 'amqp://guest:guest@oficina-rabbitmq:5672'
+  MERCADOPAGO_NOTIFICATION_URL: 'http://localhost:3002/pagamentos/webhook'

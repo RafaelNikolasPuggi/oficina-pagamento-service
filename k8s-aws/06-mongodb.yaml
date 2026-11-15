@@ -1,0 +1,58 @@
+# MongoDB self-hosted no próprio cluster EKS (em vez de um serviço gerenciado
+# como DocumentDB/Atlas) — mantém o custo da Fase 4 próximo do que já era
+# gasto na Fase 3. Só este serviço usa, então fica no namespace
+# oficina-pagamento (não em oficina-shared).
+#
+# ATENÇÃO: sem PersistentVolumeClaim de propósito — um Pod reiniciado perde
+# os dados. Isso é aceitável para a demonstração da Fase 4 (replica a mesma
+# filosofia "custo mínimo, sem multi-az" do RDS da Fase 3), mas é a primeira
+# coisa a rever antes de qualquer uso real: precisaria de uma PVC (requer o
+# addon aws-ebs-csi-driver habilitado no oficina-infra-k8s, que hoje não
+# está) ou migrar para DocumentDB/Atlas.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oficina-pagamento-mongo
+  namespace: oficina-pagamento
+  labels:
+    app: oficina-pagamento-mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oficina-pagamento-mongo
+  template:
+    metadata:
+      labels:
+        app: oficina-pagamento-mongo
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+          readinessProbe:
+            exec:
+              command: ['mongosh', '--eval', "db.adminCommand('ping')"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oficina-pagamento-mongo
+  namespace: oficina-pagamento
+spec:
+  type: ClusterIP
+  selector:
+    app: oficina-pagamento-mongo
+  ports:
+    - port: 27017
+      targetPort: 27017

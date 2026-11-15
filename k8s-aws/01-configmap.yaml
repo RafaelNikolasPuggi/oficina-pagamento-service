@@ -1,0 +1,23 @@
+# Variáveis NÃO sensíveis.
+#
+# MERCADOPAGO_NOTIFICATION_URL precisa ser atualizado manualmente depois do
+# primeiro deploy, com o hostname real da NLB (só se sabe depois que o
+# LoadBalancer é provisionado — ver step "URL pública" no ci.yml) — e esse
+# mesmo valor precisa ser configurado como a "notification URL" do
+# aplicativo no painel do Mercado Pago. Placeholder até lá.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-pagamento-app-config
+  namespace: oficina-pagamento
+data:
+  NODE_ENV: 'production'
+  PORT: '3002'
+  MONGODB_URI: 'mongodb://oficina-pagamento-mongo:27017/oficina_pagamento'
+  RABBITMQ_URL: 'amqp://guest:guest@oficina-rabbitmq.oficina-shared.svc.cluster.local:5672'
+  MERCADOPAGO_NOTIFICATION_URL: 'https://TROQUE-PELO-HOSTNAME-DA-NLB/pagamentos/webhook'
+  NEW_RELIC_ENABLED: 'true'
+  NEW_RELIC_NO_CONFIG_FILE: 'true'
+  NEW_RELIC_APP_NAME: 'oficina-pagamento-service'
+  NEW_RELIC_LOG: 'stdout'
+  NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: 'true'
