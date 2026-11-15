@@ -54,6 +54,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -77,3 +79,192 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.image_tag }}
             ${{ steps.meta.outputs.image_name }}:latest
+
+  deploy:
+    name: Provisionar cluster local (kind) e validar o deploy
+    needs: docker-build-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - uses: helm/kind-action@v1
+        with:
+          install_only: true
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Gerar segredos efêmeros para este deploy de CI
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Terraform init & apply (cluster + MongoDB + RabbitMQ)
+        working-directory: infra
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Configurar kubectl para o cluster provisionado
+        working-directory: infra
+        run: |
+          echo "KUBECONFIG=$(terraform output -raw kubeconfig_path)" >> "$GITHUB_ENV"
+
+      - name: Criar Secrets (aplicação + pull da imagem privada do ghcr.io)
+        run: |
+          kubectl create namespace oficina-pagamento --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic oficina-pagamento-app-secret -n oficina-pagamento \
+            --from-literal=JWT_SECRET="${JWT_SECRET}" \
+            --from-literal=MERCADOPAGO_ACCESS_TOKEN="" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret docker-registry ghcr-pull-secret -n oficina-pagamento \
+            --docker-server=ghcr.io \
+            --docker-username="${{ github.actor }}" \
+            --docker-password="${{ secrets.GITHUB_TOKEN }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl patch serviceaccount default -n oficina-pagamento \
+            -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
+
+      - name: Aplicar manifestos Kubernetes da aplicação
+        run: |
+          sed "s#ghcr.io/OWNER/oficina-pagamento-service:latest#${{ needs.docker-build-push.outputs.image_tag }}#" \
+            k8s/03-deployment.yaml > /tmp/03-deployment.yaml
+          kubectl apply -f k8s/00-namespace.yaml
+          kubectl apply -f k8s/01-configmap.yaml
+          kubectl apply -f /tmp/03-deployment.yaml
+          kubectl apply -f k8s/04-service.yaml
+          kubectl apply -f k8s/05-hpa.yaml
+          kubectl -n oficina-pagamento rollout status deployment/oficina-pagamento-app --timeout=180s || {
+            echo "::group::Diagnóstico (rollout não completou a tempo)"
+            kubectl -n oficina-pagamento get pods -o wide
+            kubectl -n oficina-pagamento describe pods -l app=oficina-pagamento-app
+            kubectl -n oficina-pagamento logs -l app=oficina-pagamento-app --all-containers --tail=100 || true
+            echo "::endgroup::"
+            exit 1
+          }
+
+      - name: Smoke test — health check
+        run: |
+          kubectl -n oficina-pagamento port-forward svc/oficina-pagamento-app 8082:80 &
+          sleep 5
+          curl --fail http://localhost:8082/health
+
+      - name: Destruir o cluster efêmero de CI
+        if: always()
+        working-directory: infra
+        run: terraform destroy -auto-approve
+
+  deploy-eks:
+    name: Deploy real no EKS (Fase 4)
+    needs: docker-build-push
+    # Só roda depois que oficina-infra-k8s já tiver sido aplicado (publica o
+    # que este job lê do SSM) e a variável de repositório
+    # AWS_DEPLOY_ENABLED=true estiver definida. Não depende do
+    # oficina-infra-db (este serviço usa MongoDB, não RDS).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - uses: azure/setup-kubectl@v4
+      - uses: azure/setup-helm@v4
+
+      - name: Apontar kubectl para o cluster EKS (oficina-infra-k8s)
+        run: |
+          EKS_CLUSTER_NAME=$(aws ssm get-parameter --name /oficina/eks_cluster_name --query Parameter.Value --output text)
+          aws eks update-kubeconfig --region "${{ vars.AWS_REGION || 'us-east-1' }}" --name "$EKS_CLUSTER_NAME"
+
+      - name: Ler segredo do JWT publicado pelo oficina-infra-db (SSM)
+        run: |
+          JWT_SECRET=$(aws ssm get-parameter --name /oficina/jwt_secret --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$JWT_SECRET"
+          echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
+
+      - name: Criar namespaces e Secrets (aplicação + pull da imagem + New Relic)
+        run: |
+          kubectl apply -f k8s-aws/00-namespace.yaml
+          kubectl create secret generic oficina-pagamento-app-secret -n oficina-pagamento \
+            --from-literal=JWT_SECRET="${JWT_SECRET}" \
+            --from-literal=MERCADOPAGO_ACCESS_TOKEN="${{ secrets.MERCADOPAGO_ACCESS_TOKEN }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret docker-registry ghcr-pull-secret -n oficina-pagamento \
+            --docker-server=ghcr.io \
+            --docker-username="${{ github.actor }}" \
+            --docker-password="${{ secrets.GITHUB_TOKEN }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl patch serviceaccount default -n oficina-pagamento \
+            -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
+          if [ -n "${{ secrets.NEW_RELIC_LICENSE_KEY }}" ]; then
+            kubectl create secret generic newrelic-secret -n oficina-pagamento \
+              --from-literal=license-key="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          fi
+
+      - name: Aplicar MongoDB (próprio) e RabbitMQ compartilhado (idempotente)
+        run: |
+          kubectl apply -f k8s-aws/06-mongodb.yaml
+          kubectl apply -f k8s-aws/07-rabbitmq.yaml
+
+      - name: Aplicar manifestos Kubernetes da aplicação (k8s-aws/)
+        run: |
+          sed -e "s#ghcr.io/OWNER/oficina-pagamento-service:latest#${{ needs.docker-build-push.outputs.image_tag }}#" \
+              k8s-aws/03-deployment.yaml > /tmp/03-deployment.yaml
+          kubectl apply -f k8s-aws/01-configmap.yaml
+          kubectl apply -f /tmp/03-deployment.yaml
+          kubectl apply -f k8s-aws/04-service.yaml
+          kubectl apply -f k8s-aws/05-hpa.yaml
+          kubectl -n oficina-pagamento rollout status deployment/oficina-pagamento-app --timeout=300s || {
+            echo "::group::Diagnóstico (rollout não completou a tempo)"
+            kubectl -n oficina-pagamento get pods -o wide
+            kubectl -n oficina-pagamento describe pods -l app=oficina-pagamento-app
+            kubectl -n oficina-pagamento logs -l app=oficina-pagamento-app --all-containers --tail=100 || true
+            echo "::endgroup::"
+            exit 1
+          }
+
+      - name: Reiniciar os pods se algum secret mudou (New Relic ou Mercado Pago)
+        env:
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: |
+          if [ -n "$NEW_RELIC_LICENSE_KEY" ]; then
+            kubectl -n oficina-pagamento rollout restart deployment/oficina-pagamento-app
+            kubectl -n oficina-pagamento rollout status deployment/oficina-pagamento-app --timeout=180s
+          fi
+
+      - name: Instalar integração do New Relic com o Kubernetes (métricas de CPU/memória/healthchecks + logs)
+        env:
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: |
+          if [ -n "$NEW_RELIC_LICENSE_KEY" ]; then
+            helm repo add newrelic https://helm-charts.newrelic.com
+            helm repo update
+            kubectl delete mutatingwebhookconfiguration newrelic-bundle-nri-metadata-injection --ignore-not-found
+            helm upgrade --install newrelic-bundle newrelic/nri-bundle \
+              --namespace newrelic --create-namespace \
+              --set global.licenseKey="${NEW_RELIC_LICENSE_KEY}" \
+              --set global.cluster=oficina-eks \
+              --set newrelic-infrastructure.privileged=true \
+              --set kube-state-metrics.enabled=true \
+              --set newrelic-logging.enabled=true \
+              --set newrelic-logging.fluentBit.filter.excludeSystem=true \
+              --wait --timeout 8m \
+              || echo "::warning::Integração do New Relic com o Kubernetes falhou ou expirou o tempo limite -- a aplicação em si já foi implantada com sucesso no step anterior."
+          else
+            echo "NEW_RELIC_LICENSE_KEY não configurado — pulando integração de Kubernetes."
+          fi
+
+      - name: URL pública do app (NLB) — webhook do Mercado Pago
+        run: |
+          echo "Aguardando o Load Balancer ficar pronto..."
+          sleep 30
+          echo "Atualize MERCADOPAGO_NOTIFICATION_URL (k8s-aws/01-configmap.yaml) e a notification URL no painel do Mercado Pago com:"
+          kubectl -n oficina-pagamento get svc oficina-pagamento-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'

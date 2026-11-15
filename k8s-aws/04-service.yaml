@@ -1,0 +1,20 @@
+# type: LoadBalancer — diferente do producao-service, este serviço PRECISA
+# ser público: é nele que o Mercado Pago chama o webhook de confirmação de
+# pagamento (POST /pagamentos/webhook).
+apiVersion: v1
+kind: Service
+metadata:
+  name: oficina-pagamento-app
+  namespace: oficina-pagamento
+  labels:
+    app: oficina-pagamento-app
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: 'nlb'
+spec:
+  type: LoadBalancer
+  selector:
+    app: oficina-pagamento-app
+  ports:
+    - port: 80
+      targetPort: 3002
+      protocol: TCP
