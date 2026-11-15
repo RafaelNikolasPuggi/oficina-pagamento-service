@@ -61,6 +61,7 @@ spec:
               command: ['mongosh', '--eval', "db.adminCommand('ping')"]
             initialDelaySeconds: 10
             periodSeconds: 5
+            timeoutSeconds: 10 # mongosh é um CLI Node.js; o default de 1s nunca é suficiente pra iniciar
           resources:
             requests:
               cpu: '100m'

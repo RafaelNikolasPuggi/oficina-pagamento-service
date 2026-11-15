@@ -102,6 +102,7 @@ resource "kubernetes_deployment" "mongodb" {
             }
             initial_delay_seconds = 10
             period_seconds        = 5
+            timeout_seconds       = 10 # mongosh é um CLI Node.js; o default de 1s nunca é suficiente pra iniciar
           }
         }
 
