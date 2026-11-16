@@ -15,7 +15,15 @@ data:
   PORT: '3002'
   MONGODB_URI: 'mongodb://oficina-pagamento-mongo:27017/oficina_pagamento'
   RABBITMQ_URL: 'amqp://guest:guest@oficina-rabbitmq.oficina-shared.svc.cluster.local:5672'
-  MERCADOPAGO_NOTIFICATION_URL: 'https://TROQUE-PELO-HOSTNAME-DA-NLB/pagamentos/webhook'
+  # O NLB (k8s-aws/04-service.yaml) só escuta na porta 80 em TCP puro, sem
+  # TLS -- por isso http, não https; um valor https aqui faria o Mercado
+  # Pago falhar a conexão (handshake TLS contra um listener que não fala TLS).
+  # SonarCloud sinaliza isso como hotspot de segurança (S5332, protocolo em
+  # texto claro) -- aceito conscientemente: TLS exigiria um certificado ACM,
+  # que por sua vez exige um domínio próprio apontando pro NLB (não dá pra
+  # emitir certificado para o hostname *.elb.amazonaws.com autogerado). Fora
+  # de escopo para um ambiente de demonstração acadêmica.
+  MERCADOPAGO_NOTIFICATION_URL: 'http://a31b8cb0a618145b98b6cd81842055dd-cb7b787d35bfcc9d.elb.us-east-1.amazonaws.com/pagamentos/webhook'
   NEW_RELIC_ENABLED: 'true'
   NEW_RELIC_NO_CONFIG_FILE: 'true'
   NEW_RELIC_APP_NAME: 'oficina-pagamento-service'
