@@ -1,7 +1,8 @@
 # oficina-pagamento-service
 
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=RafaelNikolasPuggi_oficina-pagamento-service&metric=coverage)](https://sonarcloud.io/summary/new_code?id=RafaelNikolasPuggi_oficina-pagamento-service)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=RafaelNikolasPuggi_oficina-pagamento-service&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=RafaelNikolasPuggi_oficina-pagamento-service)
+
+**Cobertura de testes: 94,07% de linhas** (gate obrigatório no CI, mínimo 80% — build falha abaixo disso). O SonarCloud roda em modo de análise automática, que não executa testes e por isso não reporta esse número em badge; a evidência real é o próprio [log do CI](https://github.com/RafaelNikolasPuggi/oficina-pagamento-service/actions/workflows/ci.yml), que imprime a cobertura a cada push, mais o artefato `coverage/` (relatório HTML) anexado a cada execução.
 
 Microsserviço de **Pagamentos** (integração Mercado Pago) do sistema de gestão da oficina — Tech Challenge Fase 4 (POS TECH / SOAT).
 
