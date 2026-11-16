@@ -23,6 +23,7 @@ export interface PagamentoSnapshot {
   valor: number;
   status: StatusPagamento;
   mercadoPagoPreferenceId: string | null;
+  linkPagamento: string | null;
   mercadoPagoPaymentId: string | null;
   eventos: EventoGateway[];
   criadoEm: Date;
@@ -42,6 +43,7 @@ export class Pagamento extends Entity {
   private readonly valor: number;
   private status: StatusPagamento;
   private mercadoPagoPreferenceId: string | null;
+  private linkPagamento: string | null;
   private mercadoPagoPaymentId: string | null;
   private eventos: EventoGateway[];
   private readonly criadoEm: Date;
@@ -63,6 +65,7 @@ export class Pagamento extends Entity {
     const pagamento = new Pagamento(props.id, props, agora);
     pagamento.status = StatusPagamento.PENDENTE;
     pagamento.mercadoPagoPreferenceId = null;
+    pagamento.linkPagamento = null;
     pagamento.mercadoPagoPaymentId = null;
     pagamento.eventos = [];
     pagamento.atualizadoEm = agora;
@@ -73,6 +76,7 @@ export class Pagamento extends Entity {
     const pagamento = new Pagamento(snapshot.id, snapshot, snapshot.criadoEm);
     pagamento.status = snapshot.status;
     pagamento.mercadoPagoPreferenceId = snapshot.mercadoPagoPreferenceId;
+    pagamento.linkPagamento = snapshot.linkPagamento;
     pagamento.mercadoPagoPaymentId = snapshot.mercadoPagoPaymentId;
     pagamento.eventos = snapshot.eventos;
     pagamento.atualizadoEm = snapshot.atualizadoEm;
@@ -89,8 +93,9 @@ export class Pagamento extends Entity {
     this.atualizadoEm = new Date();
   }
 
-  registrarPreferenciaCriada(preferenceId: string): void {
+  registrarPreferenciaCriada(preferenceId: string, linkPagamento: string | null): void {
     this.mercadoPagoPreferenceId = preferenceId;
+    this.linkPagamento = linkPagamento;
     this.atualizadoEm = new Date();
   }
 
@@ -129,6 +134,10 @@ export class Pagamento extends Entity {
 
   getMercadoPagoPreferenceId(): string | null {
     return this.mercadoPagoPreferenceId;
+  }
+
+  getLinkPagamento(): string | null {
+    return this.linkPagamento;
   }
 
   getMercadoPagoPaymentId(): string | null {

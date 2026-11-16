@@ -11,7 +11,7 @@ describe('PagamentoMapper', () => {
       clienteId: 'cliente-1',
       valor: 210,
     });
-    pagamento.registrarPreferenciaCriada('pref-123');
+    pagamento.registrarPreferenciaCriada('pref-123', 'https://mercadopago.com/checkout/pref-123');
 
     const doc = PagamentoMapper.toPersistence(pagamento);
 
@@ -19,6 +19,7 @@ describe('PagamentoMapper', () => {
     expect(doc.valor).toBe(210);
     expect(doc.status).toBe(StatusPagamento.PENDENTE);
     expect(doc.mercadoPagoPreferenceId).toBe('pref-123');
+    expect(doc.linkPagamento).toBe('https://mercadopago.com/checkout/pref-123');
   });
 
   it('converte de documento Mongo para domínio', () => {
@@ -29,6 +30,7 @@ describe('PagamentoMapper', () => {
       valor: 210,
       status: StatusPagamento.APROVADO,
       mercadoPagoPreferenceId: 'pref-123',
+      linkPagamento: 'https://mercadopago.com/checkout/pref-123',
       mercadoPagoPaymentId: 'mp-1',
       eventos: [],
       criadoEm: new Date(),

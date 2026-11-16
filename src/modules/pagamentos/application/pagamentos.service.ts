@@ -59,7 +59,10 @@ export class PagamentosService {
       valor: input.valor,
       descricao: `Ordem de Serviço #${input.ordemServicoId.slice(0, 8)}`,
     });
-    pagamento.registrarPreferenciaCriada(preferencia.preferenceId);
+    pagamento.registrarPreferenciaCriada(
+      preferencia.preferenceId,
+      preferencia.initPoint ?? null,
+    );
 
     return this.pagamentoRepository.salvar(pagamento);
   }
