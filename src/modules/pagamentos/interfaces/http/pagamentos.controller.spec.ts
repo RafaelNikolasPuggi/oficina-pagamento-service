@@ -24,18 +24,6 @@ describe('PagamentosController', () => {
     controller = new PagamentosController(pagamentosService);
   });
 
-  it('criar delega pro service e devolve o DTO de resposta', async () => {
-    pagamentosService.criarParaOrdemServico.mockResolvedValueOnce(pagamento);
-
-    const resultado = await controller.criar({
-      ordemServicoId: 'os-1',
-      clienteId: 'cliente-1',
-      valor: 210,
-    });
-
-    expect(resultado.id).toBe('pagamento-1');
-  });
-
   it('webhook delega pro service com os dados extraídos do payload', async () => {
     pagamentosService.processarWebhook.mockResolvedValueOnce(pagamento);
 

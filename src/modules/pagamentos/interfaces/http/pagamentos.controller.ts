@@ -16,7 +16,6 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { PagamentosService } from '../../application/pagamentos.service';
-import { CriarPagamentoDto } from './dto/criar-pagamento.dto';
 import { PagamentoResponseDto } from './dto/pagamento-response.dto';
 import { WebhookMercadoPagoDto } from './dto/webhook-mercadopago.dto';
 
@@ -24,17 +23,6 @@ import { WebhookMercadoPagoDto } from './dto/webhook-mercadopago.dto';
 @Controller('pagamentos')
 export class PagamentosController {
   constructor(private readonly pagamentosService: PagamentosService) {}
-
-  /**
-   * Endpoint interno (chamado pelo os-service quando a OS é finalizada) —
-   * sem JwtAuthGuard, só acessado dentro da rede do cluster.
-   */
-  @Post()
-  @ApiExcludeEndpoint()
-  async criar(@Body() dto: CriarPagamentoDto): Promise<PagamentoResponseDto> {
-    const pagamento = await this.pagamentosService.criarParaOrdemServico(dto);
-    return PagamentoResponseDto.fromDomain(pagamento);
-  }
 
   /**
    * Webhook público do Mercado Pago — autenticado pela própria consulta ao
