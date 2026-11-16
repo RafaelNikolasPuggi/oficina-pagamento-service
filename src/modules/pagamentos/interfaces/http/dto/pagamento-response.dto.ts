@@ -21,6 +21,9 @@ export class PagamentoResponseDto {
   @ApiProperty({ nullable: true })
   mercadoPagoPreferenceId: string | null;
 
+  @ApiProperty({ nullable: true, description: 'Link do checkout (Checkout Pro) para o cliente pagar.' })
+  linkPagamento: string | null;
+
   @ApiProperty({ nullable: true })
   mercadoPagoPaymentId: string | null;
 
@@ -38,6 +41,7 @@ export class PagamentoResponseDto {
     dto.valor = pagamento.getValor();
     dto.status = pagamento.getStatus();
     dto.mercadoPagoPreferenceId = pagamento.getMercadoPagoPreferenceId();
+    dto.linkPagamento = pagamento.getLinkPagamento();
     dto.mercadoPagoPaymentId = pagamento.getMercadoPagoPaymentId();
     dto.criadoEm = pagamento.getCriadoEm();
     dto.atualizadoEm = pagamento.getAtualizadoEm();

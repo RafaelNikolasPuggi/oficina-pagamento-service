@@ -31,8 +31,11 @@ describe('Pagamento', () => {
 
   it('registra a preferência criada no Mercado Pago', () => {
     const pagamento = criar();
-    pagamento.registrarPreferenciaCriada('pref-123');
+    pagamento.registrarPreferenciaCriada('pref-123', 'https://mercadopago.com/checkout/pref-123');
     expect(pagamento.getMercadoPagoPreferenceId()).toBe('pref-123');
+    expect(pagamento.getLinkPagamento()).toBe(
+      'https://mercadopago.com/checkout/pref-123',
+    );
   });
 
   it('aprova o pagamento e guarda o evento do gateway', () => {

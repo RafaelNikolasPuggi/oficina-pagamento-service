@@ -1,3 +1,4 @@
+import { DomainException } from '../../../../shared/domain/exceptions';
 import { Pagamento } from '../../domain/pagamento.entity';
 import type { PagamentosService } from '../../application/pagamentos.service';
 import { PagamentosController } from './pagamentos.controller';
@@ -34,6 +35,13 @@ describe('PagamentosController', () => {
       mercadoPagoPaymentId: '123',
       payload: { type: 'payment', data: { id: '123' } },
     });
+  });
+
+  it('webhook rejeita quando data.id não vem como string', async () => {
+    await expect(
+      controller.webhook({ type: 'payment', data: {} }),
+    ).rejects.toThrow(DomainException);
+    expect(pagamentosService.processarWebhook).not.toHaveBeenCalled();
   });
 
   it('obter devolve o pagamento mapeado pra DTO', async () => {

@@ -29,6 +29,9 @@ export class PagamentoDocument {
   @Prop({ type: String, default: null })
   mercadoPagoPreferenceId: string | null;
 
+  @Prop({ type: String, default: null })
+  linkPagamento: string | null;
+
   @Prop({ type: String, default: null, index: true })
   mercadoPagoPaymentId: string | null;
 
